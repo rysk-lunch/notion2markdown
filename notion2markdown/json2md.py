@@ -208,9 +208,11 @@ class JsonToMd:
     def apply_dates(self, value, prv=None, nxt=None):
         if isinstance(value, dict):
             if value.get("start") and not value.get("end"):
-                return datetime.strptime(
-                    self.json2md(value["start"]), "%Y-%m-%d"
-                ).strftime("%b %e, %Y")
+                # ISO 8601形式の日付文字列からTで分割して日付部分だけを取得
+                date_str = self.json2md(value["start"])
+                if "T" in date_str:
+                    date_str = date_str.split("T")[0]  # 日付部分だけを取得
+                return datetime.strptime(date_str, "%Y-%m-%d").strftime("%b %e, %Y")
         # TODO: catch any other dates?
         return noop
 
