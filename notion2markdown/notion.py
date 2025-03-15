@@ -89,7 +89,7 @@ class NotionIO:
 
     def save(self, blocks: List[dict], path: str):
         """Dump blocks to json file."""
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(blocks, f, default=self.transformer.reverse, indent=4)
 
 
