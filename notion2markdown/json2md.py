@@ -7,6 +7,7 @@ from typing import List, Union
 
 from .utils import normalize_id, get_whitespace
 
+
 class Noop:
     pass
 
@@ -22,14 +23,13 @@ def rule(func):
     return func
 
 
-
 class JsonToMdConverter:
     def __init__(self, strip_meta_chars=None, extension="md"):
-        self.stripchars=strip_meta_chars
-        self.extention=extension
+        self.stripchars = strip_meta_chars
+        self.extention = extension
 
     def get_key(self, value):
-        if self.stripchars == None:
+        if self.stripchars is None:
             return value
 
         return value.strip(self.stripchars)
@@ -55,7 +55,8 @@ class JsonToMdConverter:
             }
 
         paths = [
-            path for path in glob.glob(str(json_dir / "*.json"))
+            path
+            for path in glob.glob(str(json_dir / "*.json"))
             if Path(path).name != "database.json"
         ]
         for path in paths:
@@ -67,7 +68,7 @@ class JsonToMdConverter:
                     continue
                 metadata = page_id_to_metadata[page_id]
                 markdown = JsonToMd(metadata).page2md(blocks)
-                with open(path, "w", encoding='utf-8') as f:
+                with open(path, "w", encoding="utf-8") as f:
                     f.write(markdown)
 
                 if len(paths) == 1:
@@ -106,13 +107,19 @@ class JsonToMd:
         return noop
 
     @rule
-    def apply_annotation(self, value, prv=None, nxt=None, annotation_to_mark={
-        "strikethrough": "~~",
-        "bold": "**",
-        "italic": "*",
-        "underline": "__",
-        "code": "`",
-    }):
+    def apply_annotation(
+        self,
+        value,
+        prv=None,
+        nxt=None,
+        annotation_to_mark={
+            "strikethrough": "~~",
+            "bold": "**",
+            "italic": "*",
+            "underline": "__",
+            "code": "`",
+        },
+    ):
         """
         >>> c = JsonToMd()
         >>> hello_bold = {"type": "text", "text": {"content": "hello", "link": None}, "annotations": {"bold": True, "italic": False, "strikethrough": False, "underline": False, "code": False, "color": "default"}}
@@ -151,44 +158,49 @@ class JsonToMd:
             # open annotations first
             applied = []
             for annotation, mark in annotation_to_mark.items():
-                if (
-                    annotation not in self.state["apply_annotation"]["annotations"]
-                    and annotations.get(annotation)
-                ):
+                if annotation not in self.state["apply_annotation"][
+                    "annotations"
+                ] and annotations.get(annotation):
                     # NOTE: starting annotations in this loop work from the
                     # inside out. so we need to insert them at the beginning of
                     # the list
                     applied.insert(0, annotation)
                     if not (prv and prv.get("annotations", {}).get(annotation)):
                         lines = []
-                        for line in text.split('\n'):
+                        for line in text.split("\n"):
                             if line:
                                 whitespace, stripped = get_whitespace(line)
-                                lines.append(f'{whitespace}{mark}{stripped}')
+                                lines.append(f"{whitespace}{mark}{stripped}")
                             else:
-                                lines.append('')
-                        text = '\n'.join(lines)
+                                lines.append("")
+                        text = "\n".join(lines)
 
             # add the new annotations to the end* of the list of open annotations
             self.state["apply_annotation"]["annotations"].extend(applied)
 
             # close annotations in the order they were opened
             for annotation in self.state["apply_annotation"]["annotations"][::-1]:
-
                 # Strange case where an empty bold new line stops from terminating block
-                if nxt and (nxt.get("text", {}).get("content") == "\n" or nxt.get("text", {}).get("content") == " "):
-                    nxt=None
+                if nxt and (
+                    nxt.get("text", {}).get("content") == "\n"
+                    or nxt.get("text", {}).get("content") == " "
+                ):
+                    nxt = None
 
                 if not (nxt and nxt.get("annotations", {}).get(annotation)):
                     self.state["apply_annotation"]["annotations"].remove(annotation)
                     lines = []
-                    for line in text.split('\n'):
+                    for line in text.split("\n"):
                         if line:
                             whitespace, stripped = get_whitespace(line, leading=False)
-                            lines.append(f'{stripped}{annotation_to_mark[annotation]}{whitespace}')
+                            lines.append(
+                                f"{stripped}{annotation_to_mark[annotation]}{whitespace}"
+                            )
                         else:
-                            lines.append('') # NOTE: markdown syntax does not apply to multiple lines
-                    text = '\n'.join(lines)
+                            lines.append(
+                                ""
+                            )  # NOTE: markdown syntax does not apply to multiple lines
+                    text = "\n".join(lines)
             return text
         return noop
 
@@ -220,7 +232,12 @@ class JsonToMd:
     def block_callout(self, value, prv=None, nxt=None):
         # Following this convention: https://docs.readme.com/rdmd/docs/callouts (callouts denoted by leading emoji)
         if isinstance(value, dict) and value.get("type", "") == "callout":
-            return '\n'.join([f"> {line}" for line in f"{self.json2md(value['callout']['icon'])}\n\n{self.json2md(value['callout']['rich_text'])}\n{self.jsons2md(value['children'])}".splitlines()])
+            return "\n".join(
+                [
+                    f"> {line}"
+                    for line in f"{self.json2md(value['callout']['icon'])}\n\n{self.json2md(value['callout']['rich_text'])}\n{self.jsons2md(value['children'])}".splitlines()
+                ]
+            )
         return noop
 
     @rule
@@ -290,7 +307,7 @@ class JsonToMd:
     def block_quote(self, value, prv=None, nxt=None):
         if isinstance(value, dict) and value.get("type", "") == "quote":
             out = f"> {self.json2md(value['quote']['rich_text'])}\n{self.jsons2md(value['children'])}"
-            return '\n> '.join(out.splitlines())
+            return "\n> ".join(out.splitlines())
         return noop
 
     @rule
@@ -312,15 +329,15 @@ class JsonToMd:
             table = value["children"]
             header = table[0]["table_row"]["cells"]
             lines.append(
-                "|" + "|".join([self.json2md(cell[0]) if cell else '' for cell in header]) + "|"
+                "|"
+                + "|".join([self.json2md(cell[0]) if cell else "" for cell in header])
+                + "|"
             )
             lines.append("|" + "|".join(["---" for _ in header]) + "|")
             for child in table[1:]:
                 row = child["table_row"]["cells"]
                 lines.append(
-                    "|"
-                    + "|".join([self.json2md(cell[0]) for cell in row])
-                    + "|"
+                    "|" + "|".join([self.json2md(cell[0]) for cell in row]) + "|"
                 )
             lines.append("")
             return "\n".join(lines)
@@ -333,22 +350,24 @@ class JsonToMd:
         - caption_mode: alt, em, none
         """
         if isinstance(value, dict) and value.get("type", "") == "image":
-            image = value['image']
-            caption_mode = (self.config or {}).get("block_image", {}).get('caption_mode', 'em')
-            caption = self.json2md(image['caption'])
+            image = value["image"]
+            caption_mode = (
+                (self.config or {}).get("block_image", {}).get("caption_mode", "em")
+            )
+            caption = self.json2md(image["caption"])
 
-            if 'file' in image:
-                url = image['file']['url']
-            elif 'external' in image:
-                url = image['external']['url']
+            if "file" in image:
+                url = image["file"]["url"]
+            elif "external" in image:
+                url = image["external"]["url"]
             else:
                 url = None
 
-            if caption_mode == 'alt':
+            if caption_mode == "alt":
                 return f"![{caption}]({url})"
-            elif caption_mode == 'em':
+            elif caption_mode == "em":
                 return f"![]({url})\n<em>{caption}</em>"
-            elif caption_mode == 'none':
+            elif caption_mode == "none":
                 return f"![]({url})"
         return noop
 
@@ -364,8 +383,12 @@ class JsonToMd:
         After including this in your markdown or HTML, you can then render the math using [MathJax](https://github.com/mathjax/MathJax).
         """
         if isinstance(value, dict) and value.get("type", "") == "equation":
-            expression = value['equation']['expression'].replace('\\', '\\\\').replace('_', '\\_')
-            if value.get('object') == 'block':
+            expression = (
+                value["equation"]["expression"]
+                .replace("\\", "\\\\")
+                .replace("_", "\\_")
+            )
+            if value.get("object") == "block":
                 return f"$${expression}$$"
             return f"${expression}$"
         return noop
@@ -385,8 +408,8 @@ class JsonToMd:
             ):  # TODO: split this out. misc shouldnt be needed?
                 if key in value:
                     return self.json2md(value[key])
-            if 'id' in value:
-                return normalize_id(value['id'])
+            if "id" in value:
+                return normalize_id(value["id"])
         return noop
 
     @rule
@@ -437,7 +460,7 @@ class JsonToMd:
                 result += "\n"
 
             if cur["type"] == "callout" and (nxt and nxt["type"] == "callout"):
-                result += '\n<div></div>\n'  # weird property of blockquote parsing: https://stackoverflow.com/a/13066620/4855984
+                result += "\n<div></div>\n"  # weird property of blockquote parsing: https://stackoverflow.com/a/13066620/4855984
         return result
 
     def page2md(self, blocks: List[dict]) -> str:
@@ -446,8 +469,8 @@ class JsonToMd:
         for key, value in self.metadata.items():
             if value:
                 markdown += f"{key}: {value}\n"
-        markdown += f"---\n\n"
-        if title := self.metadata.get('Name') or self.metadata.get('title'):
+        markdown += "---\n\n"
+        if title := self.metadata.get("Name") or self.metadata.get("title"):
             markdown += f"# {title}\n\n"
         markdown += self.jsons2md(blocks)
         return markdown
