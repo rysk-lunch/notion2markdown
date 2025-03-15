@@ -3,6 +3,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("notion2markdown")
+logger.propagate = False
 
 
 def normalize_id(id: str) -> str:
