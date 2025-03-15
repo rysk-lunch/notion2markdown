@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import List, Union
 
+from .utils import normalize_id, get_whitespace
+
 class Noop:
     pass
 
@@ -65,7 +67,7 @@ class JsonToMdConverter:
                     continue
                 metadata = page_id_to_metadata[page_id]
                 markdown = JsonToMd(metadata).page2md(blocks)
-                with open(path, "w") as f:
+                with open(path, "w", encoding='utf-8') as f:
                     f.write(markdown)
 
                 if len(paths) == 1:
@@ -133,6 +135,11 @@ class JsonToMd:
         >>> blank = {"type":"text","text":{"content":"\\n","link":None},"annotations":{"bold":True,"italic":False,"strikethrough":False,"underline":False,"code":False,"color":"default"},"plain_text":"\\n","href":None}
         >>> c.json2md(heading, None, blank)
         '**Payment Claim assessed by Head Contractor**'
+        >>> c = JsonToMd()
+        >>> hello = {"type":"text","text":{"content":"Hello ","link":None},"annotations":{"bold":True,"italic":False,"strikethrough":False,"underline":False,"code":False,"color":"blue"},"plain_text":"Hello ","href":None}
+        >>> world = {"type": "text", "text": {"content": "world"}}
+        >>> c.json2md([hello, world])  # moves space to outside of the bold for valid markdown
+        '**Hello** world'
         """
         if isinstance(value, dict) and "type" in value:
             state = self.state["apply_annotation"]
@@ -153,10 +160,14 @@ class JsonToMd:
                     # the list
                     applied.insert(0, annotation)
                     if not (prv and prv.get("annotations", {}).get(annotation)):
-                        text = '\n'.join([
-                            f'{mark}{line.strip()}' if line else ''
-                            for line in text.split('\n')
-                        ])  # NOTE: markdown syntax does not apply to multiple lines
+                        lines = []
+                        for line in text.split('\n'):
+                            if line:
+                                whitespace, stripped = get_whitespace(line)
+                                lines.append(f'{whitespace}{mark}{stripped}')
+                            else:
+                                lines.append('')
+                        text = '\n'.join(lines)
 
             # add the new annotations to the end* of the list of open annotations
             self.state["apply_annotation"]["annotations"].extend(applied)
@@ -170,10 +181,14 @@ class JsonToMd:
 
                 if not (nxt and nxt.get("annotations", {}).get(annotation)):
                     self.state["apply_annotation"]["annotations"].remove(annotation)
-                    text = '\n'.join([
-                        f'{line}{annotation_to_mark[annotation]}' if line else ''
-                        for line in text.split('\n')
-                    ])  # NOTE: markdown syntax does not apply to multiple lines
+                    lines = []
+                    for line in text.split('\n'):
+                        if line:
+                            whitespace, stripped = get_whitespace(line, leading=False)
+                            lines.append(f'{stripped}{annotation_to_mark[annotation]}{whitespace}')
+                        else:
+                            lines.append('') # NOTE: markdown syntax does not apply to multiple lines
+                    text = '\n'.join(lines)
             return text
         return noop
 
@@ -297,7 +312,7 @@ class JsonToMd:
             table = value["children"]
             header = table[0]["table_row"]["cells"]
             lines.append(
-                "|" + "|".join([self.json2md(cell[0]) for cell in header]) + "|"
+                "|" + "|".join([self.json2md(cell[0]) if cell else '' for cell in header]) + "|"
             )
             lines.append("|" + "|".join(["---" for _ in header]) + "|")
             for child in table[1:]:
@@ -328,6 +343,7 @@ class JsonToMd:
                 url = image['external']['url']
             else:
                 url = None
+
             if caption_mode == 'alt':
                 return f"![{caption}]({url})"
             elif caption_mode == 'em':
